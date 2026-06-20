@@ -139,6 +139,14 @@ def inicializar_banco() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_config (
+                chave TEXT PRIMARY KEY,
+                valor TEXT NOT NULL
+            )
+            """
+        )
 
 
 def normalizar_turno(valor: str) -> str:
@@ -160,14 +168,13 @@ def numero(valor: str | int | float | None) -> float:
 
 
 def migrar_csv_legado() -> None:
+    if obter_config("csv_legado_migrado") == "1":
+        return
+
     if not CSV_LEGADO_PATH.exists():
         return
 
     with conectar() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM producao").fetchone()[0]
-        if total > 0:
-            return
-
         with CSV_LEGADO_PATH.open("r", newline="", encoding="utf-8") as arquivo:
             reader = csv.DictReader(arquivo)
             for row in reader:
@@ -198,6 +205,34 @@ def migrar_csv_legado() -> None:
                         row.get("observacoes", "").strip(),
                     ),
                 )
+        conn.execute(
+            """
+            INSERT INTO app_config (chave, valor)
+            VALUES ('csv_legado_migrado', '1')
+            ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor
+            """
+        )
+
+
+def obter_config(chave: str) -> str | None:
+    with conectar() as conn:
+        row = conn.execute(
+            "SELECT valor FROM app_config WHERE chave = ?",
+            (chave,),
+        ).fetchone()
+    return row["valor"] if row else None
+
+
+def definir_config(chave: str, valor: str) -> None:
+    with conectar() as conn:
+        conn.execute(
+            """
+            INSERT INTO app_config (chave, valor)
+            VALUES (?, ?)
+            ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor
+            """,
+            (chave, valor),
+        )
 
 
 def linhas_para_dicts(rows: list[sqlite3.Row]) -> list[dict]:
@@ -328,6 +363,35 @@ def inserir_ocorrencia(registro: dict) -> tuple[bool, str]:
         return False, "Registro duplicado: esta ocorrência já existe."
     except sqlite3.Error as erro:
         return False, f"Erro ao salvar a ocorrência: {erro}"
+
+
+def contar_registros() -> dict[str, int]:
+    with conectar() as conn:
+        return {
+            "produção": conn.execute("SELECT COUNT(*) FROM producao").fetchone()[0],
+            "paradas": conn.execute("SELECT COUNT(*) FROM paradas").fetchone()[0],
+            "ocorrências": conn.execute("SELECT COUNT(*) FROM ocorrencias").fetchone()[0],
+        }
+
+
+def limpar_todos_os_dados() -> tuple[bool, str]:
+    try:
+        with conectar() as conn:
+            conn.execute("DELETE FROM ocorrencias")
+            conn.execute("DELETE FROM paradas")
+            conn.execute("DELETE FROM producao")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('producao', 'paradas', 'ocorrencias')")
+            conn.execute(
+                """
+                INSERT INTO app_config (chave, valor)
+                VALUES ('csv_legado_migrado', '1')
+                ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor
+                """
+            )
+        limpar_cache()
+        return True, "Todos os dados foram limpos com sucesso."
+    except sqlite3.Error as erro:
+        return False, f"Erro ao limpar os dados: {erro}"
 
 
 def data_iso_para_date(valor: str) -> date | None:
@@ -1013,6 +1077,46 @@ def renderizar_ia_planejamento(producao: list[dict], paradas: list[dict]) -> Non
         st.success("Nenhum sinal crítico detectado nos dados atuais.")
 
 
+def renderizar_administracao() -> None:
+    st.subheader("Administração")
+    st.markdown(
+        """
+        Use esta área quando quiser preparar o aplicativo para outra pessoa testar ou começar uma nova base.
+        Antes de limpar, baixe um backup do banco atual.
+        """
+    )
+
+    contadores = contar_registros()
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Registros de produção", contadores["produção"])
+    col2.metric("Registros de paradas", contadores["paradas"])
+    col3.metric("Ocorrências", contadores["ocorrências"])
+
+    if DB_PATH.exists():
+        st.download_button(
+            "Baixar backup SQLite",
+            data=DB_PATH.read_bytes(),
+            file_name="backup_copiloto_producao.db",
+            mime="application/octet-stream",
+        )
+
+    st.divider()
+    st.warning(
+        "A limpeza remove produção, paradas e ocorrências. Esta ação não pode ser desfeita pelo aplicativo."
+    )
+    confirmar = st.checkbox("Entendo que a limpeza apagará os dados registrados.")
+    frase = st.text_input("Digite LIMPAR DADOS para confirmar")
+
+    if st.button("Limpar todos os dados", type="primary"):
+        if not confirmar or frase.strip() != "LIMPAR DADOS":
+            st.error("Confirme a ação e digite exatamente LIMPAR DADOS.")
+            return
+        sucesso, mensagem = limpar_todos_os_dados()
+        (st.success if sucesso else st.error)(mensagem)
+        if sucesso:
+            st.rerun()
+
+
 def gerar_alertas_operacionais(producao: list[dict], paradas: list[dict]) -> list[str]:
     alertas = []
     por_linha = agrupar_soma(producao, "linha") if producao else []
@@ -1048,6 +1152,7 @@ def main() -> None:
             "Relatórios",
             "IA - Planejamento",
             "Base de Dados",
+            "Administração",
         ]
     )
 
@@ -1069,6 +1174,8 @@ def main() -> None:
         renderizar_tabela("Produção Registrada", producao, COLUNAS_PRODUCAO)
         renderizar_tabela("Paradas Registradas", paradas, COLUNAS_PARADAS)
         renderizar_tabela("Ocorrências Registradas", ocorrencias, COLUNAS_OCORRENCIAS)
+    with abas[8]:
+        renderizar_administracao()
 
 
 if __name__ == "__main__":
