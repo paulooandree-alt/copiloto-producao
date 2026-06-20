@@ -1,0 +1,19 @@
+data,linha,turno,produto,producao_planejada,producao_realizada,horas_trabalhadas,observacoes
+2026-06-15,Linha 1,1o Turno,Produto A,1200,1165,8,Operacao estavel durante o turno
+2026-06-15,Linha 2,1o Turno,Produto B,950,910,8,Pequenos ajustes no inicio
+2026-06-15,Linha 3,2o Turno,Produto C,800,760,7.5,Falta temporaria de embalagem
+2026-06-16,Linha 1,1o Turno,Produto A,1200,1240,8,Boa cadencia da equipe
+2026-06-16,Linha 2,2o Turno,Produto B,950,875,8,Setup mais longo que o previsto
+2026-06-16,Linha 3,3o Turno,Produto C,780,720,7,Reducao de velocidade por ajuste
+2026-06-17,Linha 1,2o Turno,Produto D,1000,940,8,Troca de operador no meio do turno
+2026-06-17,Linha 2,1o Turno,Produto B,950,980,8,Turno acima da meta
+2026-06-17,Linha 3,2o Turno,Produto C,800,790,8,Fluxo normal
+2026-06-18,Linha 1,1o Turno,Produto A,1200,1188,8,Operacao normal
+2026-06-18,Linha 2,2o Turno,Produto E,700,640,7.5,Atraso no abastecimento
+2026-06-18,Linha 3,3o Turno,Produto C,780,810,8,Recuperacao de producao no fim do turno
+2026-06-19,Linha 1,2o Turno,Produto D,1000,1035,8,Meta superada
+2026-06-19,Linha 2,1o Turno,Produto B,950,900,7.5,Parada curta para manutencao
+2026-06-19,Linha 3,2o Turno,Produto F,650,590,7,Produto novo em estabilizacao
+2026-06-20,Linha 1,1o Turno,Produto A,1200,1215,8,Bom desempenho
+2026-06-20,Linha 2,2o Turno,Produto E,700,715,8,Lote finalizado sem ocorrencias
+2026-06-20,Linha 3,3o Turno,Produto F,650,625,7.5,Ajustes finos de processo
