@@ -878,6 +878,19 @@ def agrupar_oee_por_linha(registros: list[dict]) -> list[dict]:
     return saida
 
 
+MAPA_COLUNAS_TABELA = {
+    "produção_planejada": "producao_planejada",
+    "produção_realizada": "producao_realizada",
+    "peças_boas": "pecas_boas",
+    "peças_reprovadas": "pecas_reprovadas",
+    "duração_minutos": "duracao_minutos",
+    "observação": "observacao",
+    "observações": "observacoes",
+    "responsável": "responsavel",
+    "ocorrência": "ocorrencia",
+}
+
+
 def renderizar_tabela(titulo: str, registros: list[dict], colunas: list[str]) -> None:
     st.subheader(titulo)
     if not registros:
@@ -891,7 +904,7 @@ def renderizar_tabela(titulo: str, registros: list[dict], colunas: list[str]) ->
     for item in registros:
         html.append("<tr>")
         for coluna in colunas:
-            chave = coluna.replace("produção", "producao").replace("duração", "duracao").replace("observação", "observacao").replace("observações", "observacoes").replace("peças", "pecas")
+            chave = MAPA_COLUNAS_TABELA.get(coluna, coluna)
             valor = item.get(chave, item.get(coluna, ""))
             if isinstance(valor, float):
                 valor = formatar_decimal(valor)
