@@ -709,18 +709,24 @@ def agrupar_soma(registros: list[dict], chave: str) -> list[dict]:
 def renderizar_graficos_producao(registros: list[dict]) -> None:
     st.subheader("Gráficos de Desempenho")
     por_dia = sorted(agrupar_soma(registros, "data"), key=lambda item: item["data"])
+    for item in por_dia:
+        partes_data = str(item["data"]).split("-")
+        item["data_rotulo"] = f"{partes_data[2]}/{partes_data[1]}" if len(partes_data) == 3 else str(item["data"])
+
     por_linha = sorted(
         agrupar_soma(registros, "linha"),
         key=lambda item: item["produção_realizada"],
         reverse=True,
     )
+    for item in por_linha:
+        item["produtividade"] = item["produção_realizada"] / item["horas_trabalhadas"] if item["horas_trabalhadas"] else 0
 
     col1, col2 = st.columns(2)
     with col1:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=[i["data"] for i in por_dia], y=[i["produção_planejada"] for i in por_dia], mode="lines+markers", name="Planejada"))
-        fig.add_trace(go.Scatter(x=[i["data"] for i in por_dia], y=[i["produção_realizada"] for i in por_dia], mode="lines+markers", name="Realizada"))
-        fig.update_layout(title="Produção Planejada x Realizada", xaxis_title="Data", yaxis_title="Quantidade")
+        fig.add_trace(go.Bar(x=[i["data_rotulo"] for i in por_dia], y=[i["produção_planejada"] for i in por_dia], name="Planejada", marker_color="#0f6fbd"))
+        fig.add_trace(go.Bar(x=[i["data_rotulo"] for i in por_dia], y=[i["produção_realizada"] for i in por_dia], name="Realizada", marker_color="#7dc4f5"))
+        fig.update_layout(title="Produção Planejada x Realizada", xaxis_title="Data", yaxis_title="Quantidade", barmode="group", xaxis_type="category")
         st.plotly_chart(fig, use_container_width=True)
 
     with col2:
@@ -738,8 +744,9 @@ def renderizar_graficos_producao(registros: list[dict]) -> None:
         st.plotly_chart(fig, use_container_width=True)
 
     with col4:
-        fig = go.Figure(go.Scatter(x=[i["horas_trabalhadas"] for i in registros], y=[i["producao_realizada"] for i in registros], mode="markers", text=[f'{i["data"]} | {i["linha"]} | {i["produto"]} | {formatar_percentual(i["eficiencia"])}' for i in registros], hoverinfo="text+x+y"))
-        fig.update_layout(title="Produção por Horas Trabalhadas", xaxis_title="Horas trabalhadas", yaxis_title="Produção realizada")
+        produtividade_maxima = max([i["produtividade"] for i in por_linha], default=0)
+        fig = go.Figure(go.Bar(x=[i["linha"] for i in por_linha], y=[i["produtividade"] for i in por_linha], marker_color="#2563eb", text=[f'{formatar_decimal(i["produtividade"])} un/h' for i in por_linha], textposition="outside"))
+        fig.update_layout(title="Produtividade por Linha", xaxis_title="Linha", yaxis_title="Produtividade (un/h)", yaxis_range=[0, produtividade_maxima * 1.2 if produtividade_maxima else 1])
         st.plotly_chart(fig, use_container_width=True)
 
 
@@ -878,19 +885,6 @@ def agrupar_oee_por_linha(registros: list[dict]) -> list[dict]:
     return saida
 
 
-MAPA_COLUNAS_TABELA = {
-    "produção_planejada": "producao_planejada",
-    "produção_realizada": "producao_realizada",
-    "peças_boas": "pecas_boas",
-    "peças_reprovadas": "pecas_reprovadas",
-    "duração_minutos": "duracao_minutos",
-    "observação": "observacao",
-    "observações": "observacoes",
-    "responsável": "responsavel",
-    "ocorrência": "ocorrencia",
-}
-
-
 def renderizar_tabela(titulo: str, registros: list[dict], colunas: list[str]) -> None:
     st.subheader(titulo)
     if not registros:
@@ -904,7 +898,7 @@ def renderizar_tabela(titulo: str, registros: list[dict], colunas: list[str]) ->
     for item in registros:
         html.append("<tr>")
         for coluna in colunas:
-            chave = MAPA_COLUNAS_TABELA.get(coluna, coluna)
+            chave = coluna.replace("produção", "producao").replace("duração", "duracao").replace("observação", "observacao").replace("observações", "observacoes").replace("peças", "pecas")
             valor = item.get(chave, item.get(coluna, ""))
             if isinstance(valor, float):
                 valor = formatar_decimal(valor)
