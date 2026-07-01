@@ -63,6 +63,40 @@ def cadastrar_usuario(nome: str, email: str, senha: str, perfil: str) -> tuple[b
     return True, "Usuário cadastrado com sucesso."
 
 
+def alterar_senha_usuario(usuario_id: int, senha_atual: str, nova_senha: str, confirmar_senha: str) -> tuple[bool, str]:
+    if not senha_atual or not nova_senha or not confirmar_senha:
+        return False, "Preencha todos os campos de senha."
+    if nova_senha != confirmar_senha:
+        return False, "A confirmação da senha não confere."
+    if len(nova_senha) < 8:
+        return False, "A nova senha deve ter pelo menos 8 caracteres."
+    if nova_senha == senha_atual:
+        return False, "A nova senha deve ser diferente da senha atual."
+
+    with conectar() as conn:
+        row = conn.execute(
+            "SELECT senha_hash FROM usuarios WHERE id = ? AND ativo = 1",
+            (usuario_id,),
+        ).fetchone()
+
+        if not row:
+            return False, "Usuário não encontrado ou inativo."
+        if not verificar_senha(senha_atual, row["senha_hash"]):
+            return False, "Senha atual incorreta."
+
+        agora = datetime.now(UTC).isoformat(timespec="seconds")
+        conn.execute(
+            """
+            UPDATE usuarios
+            SET senha_hash = ?, atualizado_em = ?
+            WHERE id = ?
+            """,
+            (gerar_hash_senha(nova_senha), agora, usuario_id),
+        )
+
+    return True, "Senha alterada com sucesso."
+
+
 def listar_usuarios() -> list[Usuario]:
     with conectar() as conn:
         rows = conn.execute(

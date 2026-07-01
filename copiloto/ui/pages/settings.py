@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from copiloto.auth.models import Usuario
-from copiloto.auth.service import cadastrar_usuario, listar_usuarios
+from copiloto.auth.service import alterar_senha_usuario, cadastrar_usuario, listar_usuarios
 from copiloto.core.config import PERFIS
 
 
@@ -19,6 +19,8 @@ def render_settings(usuario: Usuario) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    render_alterar_senha(usuario)
 
     if usuario.perfil != "Administrador":
         st.warning("Apenas administradores podem cadastrar usuários.")
@@ -43,6 +45,30 @@ def render_settings(usuario: Usuario) -> None:
             st.error(mensagem)
 
     render_lista_usuarios()
+
+
+def render_alterar_senha(usuario: Usuario) -> None:
+    st.subheader("Alterar minha senha")
+    with st.form("form_alterar_senha"):
+        col1, col2, col3 = st.columns(3)
+        senha_atual = col1.text_input("Senha atual", type="password")
+        nova_senha = col2.text_input("Nova senha", type="password")
+        confirmar_senha = col3.text_input("Confirmar nova senha", type="password")
+        alterar = st.form_submit_button("Alterar senha")
+
+    if alterar:
+        sucesso, mensagem = alterar_senha_usuario(
+            usuario.id,
+            senha_atual,
+            nova_senha,
+            confirmar_senha,
+        )
+        if sucesso:
+            st.success(mensagem)
+        else:
+            st.error(mensagem)
+
+    st.divider()
 
 
 def render_lista_usuarios() -> None:
