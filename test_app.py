@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from copiloto.auth.security import gerar_hash_senha, verificar_senha
-from copiloto.auth.service import autenticar_usuario, cadastrar_usuario, listar_usuarios
+from copiloto.auth.service import alterar_senha_usuario, autenticar_usuario, cadastrar_usuario, listar_usuarios
 from copiloto.core import config
 from copiloto.core import database
 
@@ -69,6 +69,23 @@ class CopilotoSaasFoundationTest(unittest.TestCase):
 
         self.assertFalse(sucesso)
         self.assertIn("perfil", mensagem.lower())
+
+    def test_altera_senha_do_usuario(self) -> None:
+        database.inicializar_banco()
+        _, usuario, _ = autenticar_usuario(config.ADMIN_EMAIL_PADRAO, config.ADMIN_SENHA_PADRAO)
+
+        sucesso, mensagem = alterar_senha_usuario(
+            usuario.id,
+            config.ADMIN_SENHA_PADRAO,
+            "SenhaNova@2026",
+            "SenhaNova@2026",
+        )
+        login_antigo, _, _ = autenticar_usuario(config.ADMIN_EMAIL_PADRAO, config.ADMIN_SENHA_PADRAO)
+        login_novo, _, _ = autenticar_usuario(config.ADMIN_EMAIL_PADRAO, "SenhaNova@2026")
+
+        self.assertTrue(sucesso, mensagem)
+        self.assertFalse(login_antigo)
+        self.assertTrue(login_novo)
 
 
 if __name__ == "__main__":
