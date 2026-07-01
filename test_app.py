@@ -2,131 +2,73 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-from datetime import time
 from pathlib import Path
 
-import app
+from copiloto.auth.security import gerar_hash_senha, verificar_senha
+from copiloto.auth.service import autenticar_usuario, cadastrar_usuario, listar_usuarios
+from copiloto.core import config
+from copiloto.core import database
 
 
-class CopilotoProducaoTest(unittest.TestCase):
+class CopilotoSaasFoundationTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
-        self.base = Path(self.tmp.name)
-        self.original_data_dir = app.DATA_DIR
-        self.original_outputs_dir = app.OUTPUTS_DIR
-        self.original_db_path = app.DB_PATH
-        self.original_csv_path = app.CSV_LEGADO_PATH
+        self.original_data_dir = config.DATA_DIR
+        self.original_db_path = config.DB_PATH
+        self.original_database_data_dir = database.DATA_DIR
+        self.original_database_db_path = database.DB_PATH
 
-        app.DATA_DIR = self.base / "data"
-        app.OUTPUTS_DIR = self.base / "outputs"
-        app.DB_PATH = app.DATA_DIR / "teste.db"
-        app.CSV_LEGADO_PATH = app.DATA_DIR / "producao_diaria.csv"
-        app.DATA_DIR.mkdir()
-        app.limpar_cache()
+        temp_dir = Path(self.tmp.name)
+        config.DATA_DIR = temp_dir / "data"
+        config.DB_PATH = config.DATA_DIR / "teste_saas.db"
+        database.DATA_DIR = config.DATA_DIR
+        database.DB_PATH = config.DB_PATH
 
     def tearDown(self) -> None:
-        app.limpar_cache()
-        app.DATA_DIR = self.original_data_dir
-        app.OUTPUTS_DIR = self.original_outputs_dir
-        app.DB_PATH = self.original_db_path
-        app.CSV_LEGADO_PATH = self.original_csv_path
+        config.DATA_DIR = self.original_data_dir
+        config.DB_PATH = self.original_db_path
+        database.DATA_DIR = self.original_database_data_dir
+        database.DB_PATH = self.original_database_db_path
         self.tmp.cleanup()
 
-    def test_migra_csv_legado_para_sqlite(self) -> None:
-        app.CSV_LEGADO_PATH.write_text(
-            "data,linha,turno,produto,producao_planejada,producao_realizada,horas_trabalhadas,observacoes\n"
-            "2026-06-20,Linha 1,1o Turno,Produto A,100,95,8,Teste\n",
-            encoding="utf-8",
+    def test_inicializa_banco_com_admin_padrao(self) -> None:
+        database.inicializar_banco()
+
+        sucesso, usuario, mensagem = autenticar_usuario(
+            config.ADMIN_EMAIL_PADRAO,
+            config.ADMIN_SENHA_PADRAO,
         )
 
-        app.preparar_ambiente()
-        registros = app.carregar_producao()
-
-        self.assertEqual(len(registros), 1)
-        self.assertEqual(registros[0]["turno"], "1º Turno")
-        self.assertEqual(registros[0]["producao_realizada"], 95)
-
-    def test_evitar_producao_duplicada(self) -> None:
-        app.preparar_ambiente()
-        registro = {
-            "data": "2026-06-20",
-            "linha": "Linha 1",
-            "turno": "1º Turno",
-            "produto": "Produto A",
-            "producao_planejada": 100,
-            "producao_realizada": 98,
-            "pecas_boas": 97,
-            "pecas_reprovadas": 1,
-            "horas_trabalhadas": 8,
-            "tempo_planejado_horas": 8,
-            "observacoes": "",
-        }
-
-        sucesso_1, _ = app.inserir_producao(registro)
-        sucesso_2, mensagem = app.inserir_producao(registro)
-
-        self.assertTrue(sucesso_1)
-        self.assertFalse(sucesso_2)
-        self.assertIn("duplicado", mensagem.lower())
-
-    def test_calcula_oee(self) -> None:
-        indicadores = app.calcular_indicadores_registro(
-            {
-                "producao_planejada": 100,
-                "producao_realizada": 90,
-                "pecas_boas": 85,
-                "pecas_reprovadas": 5,
-                "horas_trabalhadas": 7,
-                "tempo_planejado_horas": 8,
-            }
-        )
-
-        self.assertAlmostEqual(indicadores["disponibilidade"], 87.5)
-        self.assertAlmostEqual(indicadores["performance"], 90.0)
-        self.assertAlmostEqual(indicadores["qualidade"], 94.444444, places=4)
-        self.assertAlmostEqual(indicadores["oee"], 74.375, places=3)
-
-    def test_duracao_de_parada(self) -> None:
-        self.assertEqual(app.minutos_entre(time(8, 0), time(9, 15)), 75)
-        self.assertEqual(app.minutos_entre(time(9, 15), time(8, 0)), 0)
-
-    def test_exportacoes_basicas(self) -> None:
-        producao = [
-            {
-                "data": "2026-06-20",
-                "linha": "Linha 1",
-                "turno": "1º Turno",
-                "produto": "Produto A",
-                "producao_planejada": 100,
-                "producao_realizada": 98,
-                "pecas_boas": 97,
-                "pecas_reprovadas": 1,
-                "horas_trabalhadas": 8,
-                "tempo_planejado_horas": 8,
-                "observacoes": "Ok",
-            }
-        ]
-        abas = {"Produção": (app.COLUNAS_PRODUCAO, producao, app.mapa_producao())}
-
-        self.assertTrue(app.registros_para_csv(producao, app.COLUNAS_PRODUCAO, app.mapa_producao()).startswith(b"\xef\xbb\xbf"))
-        self.assertTrue(app.gerar_xlsx(abas).startswith(b"PK"))
-        self.assertTrue(app.gerar_pdf_texto("Teste", ["Linha 1"]).startswith(b"%PDF"))
-
-    def test_limpa_dados_sem_remigrar_csv_legado(self) -> None:
-        app.CSV_LEGADO_PATH.write_text(
-            "data,linha,turno,produto,producao_planejada,producao_realizada,horas_trabalhadas,observacoes\n"
-            "2026-06-20,Linha 1,1o Turno,Produto A,100,95,8,Teste\n",
-            encoding="utf-8",
-        )
-        app.preparar_ambiente()
-        self.assertEqual(len(app.carregar_producao()), 1)
-
-        sucesso, mensagem = app.limpar_todos_os_dados()
         self.assertTrue(sucesso, mensagem)
-        app.preparar_ambiente()
+        self.assertIsNotNone(usuario)
+        self.assertEqual(usuario.perfil, "Administrador")
 
-        self.assertEqual(app.contar_registros()["produção"], 0)
-        self.assertEqual(len(app.carregar_producao()), 0)
+    def test_hash_de_senha_nao_guarda_texto_puro(self) -> None:
+        senha_hash = gerar_hash_senha("senha123")
+
+        self.assertNotIn("senha123", senha_hash)
+        self.assertTrue(verificar_senha("senha123", senha_hash))
+        self.assertFalse(verificar_senha("errada", senha_hash))
+
+    def test_cadastra_usuario_sem_duplicidade(self) -> None:
+        database.inicializar_banco()
+
+        sucesso, _ = cadastrar_usuario("Supervisor", "sup@empresa.com", "senha123", "Supervisor")
+        repetido, mensagem = cadastrar_usuario("Supervisor", "sup@empresa.com", "senha123", "Supervisor")
+        usuarios = listar_usuarios()
+
+        self.assertTrue(sucesso)
+        self.assertFalse(repetido)
+        self.assertIn("existe", mensagem.lower())
+        self.assertEqual(len([u for u in usuarios if u.email == "sup@empresa.com"]), 1)
+
+    def test_rejeita_perfil_invalido(self) -> None:
+        database.inicializar_banco()
+
+        sucesso, mensagem = cadastrar_usuario("Teste", "teste@empresa.com", "senha123", "Diretor")
+
+        self.assertFalse(sucesso)
+        self.assertIn("perfil", mensagem.lower())
 
 
 if __name__ == "__main__":
