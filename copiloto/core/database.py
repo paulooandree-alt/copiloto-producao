@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 
 from copiloto.auth.security import gerar_hash_senha
-from copiloto.core.config import ADMIN_EMAIL_PADRAO, ADMIN_SENHA_PADRAO, DATA_DIR, DB_PATH
+from copiloto.core.config import DATA_DIR, DB_PATH, obter_credenciais_admin_inicial
 
 
 @contextmanager
@@ -48,7 +48,8 @@ def inicializar_banco() -> None:
 
 
 def criar_admin_padrao(conn: sqlite3.Connection) -> None:
-    existe = conn.execute("SELECT id FROM usuarios WHERE email = ?", (ADMIN_EMAIL_PADRAO,)).fetchone()
+    admin_email, admin_senha = obter_credenciais_admin_inicial()
+    existe = conn.execute("SELECT id FROM usuarios WHERE email = ?", (admin_email,)).fetchone()
     if existe:
         return
 
@@ -60,8 +61,8 @@ def criar_admin_padrao(conn: sqlite3.Connection) -> None:
         """,
         (
             "Administrador",
-            ADMIN_EMAIL_PADRAO,
-            gerar_hash_senha(ADMIN_SENHA_PADRAO),
+            admin_email,
+            gerar_hash_senha(admin_senha),
             agora,
             agora,
         ),

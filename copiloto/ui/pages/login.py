@@ -5,7 +5,7 @@ from collections.abc import Callable
 import streamlit as st
 
 from copiloto.auth.models import Usuario
-from copiloto.core.config import ADMIN_EMAIL_PADRAO, ADMIN_SENHA_PADRAO, APP_NAME
+from copiloto.core.config import APP_NAME
 
 
 def render_login(
@@ -16,8 +16,8 @@ def render_login(
     st.caption("Acesse sua operação industrial")
 
     with st.form("form_login"):
-        email = st.text_input("E-mail", placeholder=ADMIN_EMAIL_PADRAO)
-        senha = st.text_input("Senha", type="password", placeholder=ADMIN_SENHA_PADRAO)
+        email = st.text_input("E-mail", placeholder="seu.email@empresa.com")
+        senha = st.text_input("Senha", type="password", placeholder="Digite sua senha")
         entrar = st.form_submit_button("Entrar", use_container_width=True)
 
     if entrar:
@@ -29,5 +29,4 @@ def render_login(
         else:
             st.error(mensagem)
 
-    st.info(f"Acesso inicial: {ADMIN_EMAIL_PADRAO} / {ADMIN_SENHA_PADRAO}")
     st.markdown("</div>", unsafe_allow_html=True)
