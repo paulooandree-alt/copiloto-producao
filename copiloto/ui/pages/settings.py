@@ -19,6 +19,7 @@ def render_settings(usuario: Usuario) -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.caption("Versão atualizada em 01/07/2026 - troca de senha ativa")
 
     render_alterar_senha(usuario)
 
