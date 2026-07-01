@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+
+import streamlit as st
+
+from copiloto.auth.models import Usuario
+from copiloto.core.config import ADMIN_EMAIL_PADRAO, ADMIN_SENHA_PADRAO, APP_NAME
+
+
+def render_login(
+    autenticar: Callable[[str, str], tuple[bool, Usuario | None, str]],
+) -> None:
+    st.markdown('<div class="login-shell">', unsafe_allow_html=True)
+    st.markdown(f"## {APP_NAME}")
+    st.caption("Acesse sua operação industrial")
+
+    with st.form("form_login"):
+        email = st.text_input("E-mail", placeholder=ADMIN_EMAIL_PADRAO)
+        senha = st.text_input("Senha", type="password", placeholder=ADMIN_SENHA_PADRAO)
+        entrar = st.form_submit_button("Entrar", use_container_width=True)
+
+    if entrar:
+        sucesso, usuario, mensagem = autenticar(email, senha)
+        if sucesso and usuario:
+            st.session_state.usuario = usuario
+            st.success(mensagem)
+            st.rerun()
+        else:
+            st.error(mensagem)
+
+    st.info(f"Acesso inicial: {ADMIN_EMAIL_PADRAO} / {ADMIN_SENHA_PADRAO}")
+    st.markdown("</div>", unsafe_allow_html=True)
